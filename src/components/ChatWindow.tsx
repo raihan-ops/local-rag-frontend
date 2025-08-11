@@ -4,32 +4,45 @@ import FileUploader from './FileUploader';
 import TextInjector from './TextInjector';
 import { chat, resetConversation, injectText } from '../services/api';
 
+interface Message {
+    role: string;
+    content: string;
+    isLoading?: boolean;
+}
+
 export default function ChatWindow() {
-    const [messages, setMessages] = useState([{ role: 'assistant', content: 'Welcome — upload files or paste text and ask questions.' }]);
+    const [messages, setMessages] = useState<Message[]>([{ role: 'assistant', content: 'Welcome — upload files or paste text and ask questions.' }]);
     const [input, setInput] = useState('');
     const [topK, setTopK] = useState(3);
+    const [isLoading, setIsLoading] = useState(false);
 
     async function send() {
-        if (!input.trim()) return;
+        if (!input.trim() || isLoading) return;
         const userMsg = input.trim();
         setMessages((m) => [...m, { role: 'user', content: userMsg }]);
         setInput('');
+        setIsLoading(true);
 
-        const res = await chat(userMsg, topK);
-        if (res.error) {
-            setMessages((m) => [...m, { role: 'assistant', content: 'Error: ' + res.error }]);
-        } else {
-            setMessages((m) => [...m, { role: 'assistant', content: res.reply }]);
-            if (res.retrieved && res.retrieved.length) {
-                setMessages((m) => [
-                    ...m,
-                    {
-                        role: 'assistant',
-                        content:
-                            '\nRetrieved snippets:\n' + res.retrieved.map((r: any) => r.snippet).join('\n---\n'),
-                    },
-                ]);
+        // Add loading message
+        setMessages((m) => [...m, { role: 'assistant', content: '...', isLoading: true }]);
+
+        try {
+            const res = await chat(userMsg, topK);
+            
+            // Remove loading message
+            setMessages((m) => m.filter((msg) => !msg.isLoading));
+            
+            if (res.error) {
+                setMessages((m) => [...m, { role: 'assistant', content: 'Error: ' + res.error }]);
+            } else {
+                setMessages((m) => [...m, { role: 'assistant', content: res.reply }]);
             }
+        } catch {
+            // Remove loading message
+            setMessages((m) => m.filter((msg) => !msg.isLoading));
+            setMessages((m) => [...m, { role: 'assistant', content: 'Error: Failed to get response from server' }]);
+        } finally {
+            setIsLoading(false);
         }
     }
 
@@ -61,7 +74,7 @@ export default function ChatWindow() {
             <main className="flex-1 flex flex-col">
                 <div className="flex-1 overflow-auto p-6 bg-[#f3f4f6]">
                     {messages.map((m, i) => (
-                        <MessageBubble key={i} role={m.role} text={m.content} />
+                        <MessageBubble key={i} role={m.role} text={m.content} isLoading={m.isLoading} />
                     ))}
                 </div>
 
@@ -71,15 +84,32 @@ export default function ChatWindow() {
                         value={topK}
                         onChange={(e) => setTopK(Number(e.target.value))}
                         className="w-20 p-2 border"
+                        disabled={isLoading}
                     />
                     <textarea
                         className="flex-1 p-2 border"
                         rows={2}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                send();
+                            }
+                        }}
+                        disabled={isLoading}
+                        placeholder="Type your message..."
                     />
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={send}>
-                        Send
+                    <button 
+                        className={`px-4 py-2 rounded text-white min-w-[80px] ${
+                            isLoading 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-blue-600 hover:bg-blue-700'
+                        }`} 
+                        onClick={send}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? 'Loading...' : 'Send'}
                     </button>
                 </div>
             </main>

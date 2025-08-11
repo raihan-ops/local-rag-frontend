@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:5000/api';
+const BASE = 'http://localhost:5000/api/v2';
 
 export async function uploadFile(file: File) {
   const form = new FormData();
@@ -8,7 +8,7 @@ export async function uploadFile(file: File) {
 }
 
 export async function injectText(text: string) {
-  const res = await fetch(`${BASE}/upload/inject`, {
+  const res = await fetch(`${BASE}/upload`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
@@ -23,6 +23,11 @@ export async function chat(message: string, topK = 3) {
     credentials: 'include',
     body: JSON.stringify({ message, topK }),
   });
+  return res.json();
+}
+
+export async function getChatStatus() {
+  const res = await fetch(`${BASE}/chat/status`, { method: 'GET', credentials: 'include' });
   return res.json();
 }
 
